@@ -68,6 +68,10 @@ source .venv/bin/activate
 ```bash
 uvicorn backend.main:app --reload
 ```
+or on a server:
+```bash
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+```
 
 3. Open your web browser and go to:
 ```
