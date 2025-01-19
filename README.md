@@ -1,4 +1,4 @@
-# Building Finder
+# Neighborhood Finder
 
 A simple web application that helps you find buildings within a specified radius of any address. Built with FastAPI and OpenStreetMap data.
 
@@ -22,7 +22,7 @@ A simple web application that helps you find buildings within a specified radius
 1. Clone the repository:
 ```bash
 git clone [repository-url]
-cd building-finder
+cd NeighborhoodFinder
 ```
 
 2. Install dependencies:
@@ -76,7 +76,7 @@ http://localhost:8000
 
 ## Project Structure
 ```
-building-finder/
+NeighborhoodFinder/
 ├── backend/
 │   └── main.py         # FastAPI application and API endpoints
 ├── frontend/
@@ -137,3 +137,6 @@ Example response:
 - Subject to API rate limits
 - Building addresses may not always be available
 - Search radius limited to 200 meters maximum
+
+## Copyright
+© 2024 Martins Ierags. All rights reserved.
