@@ -64,8 +64,8 @@ async def fetch_nearby_buildings(latitude: float, longitude: float, radius: floa
                         }
                         
                         # If no address is found, create a generic one
-                        # if not building["address"].strip():
-                        #     building["address"] = f"Building at ({building['lat']:.6f}, {building['lng']:.6f})"
+                        if not building["address"].strip():
+                            building["address"] = f"Building at ({building['lat']:.6f}, {building['lng']:.6f})"
                         
                         if building["address"].strip():
                             buildings.append(building)
@@ -85,7 +85,10 @@ async def get_nearby_houses(
         # Fetch nearby buildings from OpenStreetMap
         coords = await get_coordinates_from_address(address)
         if not coords:
-            raise HTTPException(status_code=400, detail="Could not find coordinates for the provided address")
+            return {
+                "error": "Could not find the specified address. Please check the address and try again.",
+                "address_found": False
+            }
             
         latitude, longitude = coords
         buildings = await fetch_nearby_buildings(latitude, longitude, radius)
@@ -116,11 +119,18 @@ async def get_nearby_houses(
             "lng": b["lng"]
         } for b in buildings]
         
-        return nearby_houses
+        return {
+            "address_found": True,
+            "coords": coords,
+            "houses": nearby_houses
+        }
       
     except Exception as e:
         logger.error(f"Error in get_nearby_houses: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching nearby houses")
+        return {
+            "error": "An error occurred while fetching nearby houses. Please try again.",
+            "address_found": False
+        }
 
 async def get_coordinates_from_address(address: str) -> Optional[tuple[float, float]]:
     """Convert address to coordinates using Nominatim"""

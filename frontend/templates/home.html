@@ -24,14 +24,14 @@
                 type="range" 
                 id="radius-slider" 
                 min="50" 
-                max="200" 
+                max="350" 
                 value="100"
                 step="10"
                 class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
             >
             <div class="flex justify-between text-xs text-gray-600">
                 <span>50m</span>
-                <span>200m</span>
+                <span>350m</span>
             </div>
         </div>
         <button 
@@ -43,69 +43,119 @@
     </div>
 
     <div id="results" class="space-y-4">
+        <!-- Status messages will appear here -->
+        <div id="status" class="text-center text-gray-600 hidden"></div>
         <!-- Results will be populated here -->
     </div>
+
 </div>
 
 <script>
-    // Update radius value display when slider moves
-    const radiusSlider = document.getElementById('radius-slider');
-    const radiusValue = document.getElementById('radius-value');
-    
-    radiusSlider.addEventListener('input', (e) => {
-        radiusValue.textContent = e.target.value;
-    });
+// Update radius value display when slider moves
+const radiusSlider = document.getElementById('radius-slider');
+const radiusValue = document.getElementById('radius-value');
 
-    document.getElementById('search-button').addEventListener('click', async () => {
-        const input = document.getElementById('address-input').value;
-        const radius = document.getElementById('radius-slider').value;
+console.log("Script loaded"); // Verify script is loading
+
+radiusSlider.addEventListener('input', (e) => {
+    radiusValue.textContent = e.target.value;
+    console.log("Slider value changed:", e.target.value); // Verify slider works
+});
+
+function showStatus(message, type = 'info') {
+    console.log("Showing status:", message, type); // Debug status function
+    const statusDiv = document.getElementById('status');
+    if (!statusDiv) {
+        console.error("Status div not found!"); // Check if element exists
+        return;
+    }
+    
+    // Update status message
+    statusDiv.className = `text-center ${type === 'error' ? 'text-red-600' : 'text-gray-600'} mb-4`;
+    statusDiv.textContent = message;
+    statusDiv.classList.remove('hidden');
+}
+
+function clearStatus() {
+    console.log("Clearing status"); // Debug status clearing
+    const statusDiv = document.getElementById('status');
+    if (statusDiv) {
+        statusDiv.classList.add('hidden');
+        statusDiv.textContent = '';
+    }
+}
+
+document.getElementById('search-button').addEventListener('click', async () => {
+    const input = document.getElementById('address-input').value;
+    const radius = document.getElementById('radius-slider').value;
+    
+    if (!input) {
+        showStatus('Please enter an address', 'error');
+        return;
+    }
+
+    showStatus('Searching for address...');
+
+    try {
+        const url = `/api/nearby-houses?address=${encodeURIComponent(input)}&radius=${radius}`;
         
-        if (!input) {
-            alert('Please enter an address');
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.error) {
+            showStatus(data.error, 'error');
             return;
         }
 
-        try {
-            const response = await fetch(`/api/nearby-houses?address=${encodeURIComponent(input)}&radius=${radius}`);
-            const houses = await response.json();
-            
-            if (houses.error) {
-                alert(houses.error);
-                return;
-            }
-
-            displayHouses(houses);
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Error fetching nearby houses');
-        }
-    });
-
-    function displayHouses(houses) {
-        const resultsDiv = document.getElementById('results');
-        if (houses.length === 0) {
-            resultsDiv.innerHTML = `
-                <div class="text-center text-gray-600">
-                    No houses found within 100 meters.
-                </div>
-            `;
+        if (data.address_found) {
+            showStatus('Address found! Searching for nearby buildings...');
+            displayHouses(data.houses, radius);
         } else {
-            resultsDiv.innerHTML = `
-                <h3 class="font-semibold text-lg mb-2">Houses within 100 meters:</h3>
-                <div class="space-y-2">
-                    ${houses.map(house => `
-                        <div class="p-4 border rounded-lg">
-                            <p class="text-gray-800 font-medium">${house.address}</p>
-                            <div class="text-sm text-gray-600 mt-1">
-                                <p>Type: ${house.type}</p>
-                                <p>Distance: ${house.distance}</p>
-                                <p class="text-xs">Coordinates: (${house.lat}, ${house.lng})</p>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
+            showStatus('Could not find the specified address. Please check the address and try again.', 'error');
         }
+
+    } catch (error) {
+        showStatus('Error fetching nearby houses', 'error');
     }
+});
+
+function displayHouses(houses, searchRadius) {
+    const resultsDiv = document.getElementById('results');
+    if (!resultsDiv) {
+        return;
+    }
+    
+    clearStatus();
+    
+    if (houses.address_found && houses.length === 0) {
+        resultsDiv.innerHTML = `
+            <div class="text-center text-gray-600">
+                No buildings found within ${searchRadius} meters of the identified GPS coordinates ${houses.coords}.
+            </div>
+        `;
+    } else if (!houses.address_found) {
+        resultsDiv.innerHTML = `
+            <div class="text-center text-gray-600">
+                The specified address was not found.
+            </div>
+        `;
+    } else {
+        resultsDiv.innerHTML = `
+            <h3 class="font-semibold text-lg mb-2">Buildings found within ${searchRadius} meters:</h3>
+            <div class="space-y-2">
+                ${houses.map(house => `
+                    <div class="p-4 border rounded-lg">
+                        <p class="text-gray-800 font-medium">${house.address}</p>
+                        <div class="text-sm text-gray-600 mt-1">
+                            <p>Type: ${house.type}</p>
+                            <p>Distance: ${house.distance}</p>
+                            <p class="text-xs">Coordinates: (${house.lat}, ${house.lng})</p>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+}
 </script>
 {% endblock %} 
