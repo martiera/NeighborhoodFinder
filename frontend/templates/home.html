@@ -85,6 +85,20 @@ function clearStatus() {
     }
 }
 
+
+function clearResults() {
+    console.log("Clearing results"); // Debug status clearing
+    const statusDiv = document.getElementById('results');
+    if (statusDiv) {
+        // Keep the status div but clear other contents
+        const existingStatus = statusDiv.querySelector('#status');
+        statusDiv.innerHTML = '';
+        if (existingStatus) {
+            statusDiv.appendChild(existingStatus);
+        }
+    }
+}
+
 document.getElementById('search-button').addEventListener('click', async () => {
     const input = document.getElementById('address-input').value;
     const radius = document.getElementById('radius-slider').value;
@@ -95,6 +109,7 @@ document.getElementById('search-button').addEventListener('click', async () => {
     }
 
     showStatus('Searching for address...');
+    clearResults();
 
     try {
         const url = `/api/nearby-houses?address=${encodeURIComponent(input)}&radius=${radius}`;

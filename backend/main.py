@@ -29,22 +29,21 @@ async def fetch_nearby_buildings(latitude: float, longitude: float, radius: floa
     Fetch nearby buildings using OpenStreetMap's Overpass API
     radius is in meters
     """
-    # Convert meters to degrees (approximate, depends on latitude)
-    # At the equator, 1 degree ≈ 111.32 km
-    # We adjust for latitude using cos(lat)
-    lat_rad = math.radians(latitude)
-    meters_per_degree = 111320.0 * math.cos(lat_rad)
-    radius_deg = radius / meters_per_degree
-    
     # Overpass QL query to find buildings within radius
-    print(f"Searching for buildings around ({latitude}, {longitude}) with radius {radius}m ({radius_deg} degrees)")
+    print(f"Searching for buildings around ({latitude}, {longitude}) with radius {radius}m")
     query = f"""
     [out:json][timeout:25];
     (
-      way["building"](around:{radius_deg * 111320},{latitude},{longitude});
-      relation["building"](around:{radius_deg * 111320},{latitude},{longitude});
+      // Find all buildings in area
+      way(around:{radius},{latitude},{longitude})["building"];
+      relation(around:{radius},{latitude},{longitude})["building"];
+      // Also find amenities that might be buildings
+      way(around:{radius},{latitude},{longitude})["amenity"];
+      // Find places with addresses even if not tagged as buildings
+      way(around:{radius},{latitude},{longitude})["addr:housenumber"];
+      way(around:{radius},{latitude},{longitude})["addr:street"];
     );
-    out center;
+    out body center qt;
     """
     
     try:
@@ -53,21 +52,32 @@ async def fetch_nearby_buildings(latitude: float, longitude: float, radius: floa
                 if response.status != 200:
                     logger.error(f"Overpass API error: {response.status}")
                     return []
-                
                 data = await response.json()
+                print(data)
                 print(f"Found {len(data.get('elements', []))} elements in response")
                 buildings = []
                 
                 for element in data.get("elements", []):
                     if "center" in element:
+                        # Get all tags for debugging
+                        tags = element.get("tags", {})
+                        print(f"Processing building with tags: {tags}")
+                        
                         building = {
                             "id": element["id"],
                             "lat": element["center"]["lat"],
                             "lng": element["center"]["lon"],
-                            "address": element.get("tags", {}).get("addr:street", "") + " " + 
-                                     element.get("tags", {}).get("addr:housenumber", ""),
-                            "type": element.get("tags", {}).get("building", "building")
+                            "address": "",
+                            "type": tags.get("building", "building")
                         }
+                        
+                        # Try different address formats
+                        if "addr:housenumber" in tags and "addr:street" in tags:
+                            building["address"] = f"{tags['addr:street']} {tags['addr:housenumber']}"
+                        elif "addr:full" in tags:
+                            building["address"] = tags["addr:full"]
+                        elif "name" in tags:
+                            building["address"] = tags["name"]
                         
                         # If no address is found, create a generic one
                         if not building["address"].strip():
