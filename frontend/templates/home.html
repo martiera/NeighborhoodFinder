@@ -146,7 +146,7 @@ function displayHouses(data, searchRadius) {
     resultsDiv.innerHTML = `
         <div class="mb-4 text-gray-600">
             <p class="font-medium">Found address: ${data.found_address}</p>
-            <p class="text-sm">Coordinates: (${data.coords[0]}, ${data.coords[1]})</p>
+            <p class="text-sm">Coordinates: <a href="https://www.google.com/maps?q=${data.coords[0]},${data.coords[1]}" target="_blank" class="text-blue-500 hover:underline">(${data.coords[0]}, ${data.coords[1]})</a></p>
         </div>
         <h3 class="font-semibold text-lg mb-2">Buildings found within ${searchRadius} meters:</h3>
         <div class="space-y-2">
@@ -156,7 +156,7 @@ function displayHouses(data, searchRadius) {
                     <div class="text-sm text-gray-600 mt-1">
                         <p>Type: ${house.type}</p>
                         <p>Distance: ${house.distance}</p>
-                        <p class="text-xs">Coordinates: (${house.lat}, ${house.lng})</p>
+                        <p class="text-xs">Coordinates: <a href="https://www.google.com/maps?q=${house.lat},${house.lng}" target="_blank" class="text-blue-500 hover:underline">(${house.lat}, ${house.lng})</a></p>
                     </div>
                 </div>
             `).join('')}
