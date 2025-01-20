@@ -108,10 +108,14 @@ document.getElementById('search-button').addEventListener('click', async () => {
         }
 
         if (data.address_found) {
-            showStatus('Address found! Searching for nearby buildings...');
-            displayHouses(data.houses, radius);
+            if (data.houses.length === 0) {
+                showStatus(`No buildings found within ${radius} meters of ${data.found_address}`);
+            } else {
+                clearStatus();
+                displayHouses(data, radius);
+            }
         } else {
-            showStatus('Could not find the specified address. Please check the address and try again.', 'error');
+            showStatus(data.error || 'Could not find the specified address. Please check the address and try again.', 'error');
         }
 
     } catch (error) {
@@ -119,43 +123,45 @@ document.getElementById('search-button').addEventListener('click', async () => {
     }
 });
 
-function displayHouses(houses, searchRadius) {
+function displayHouses(data, searchRadius) {
+    console.log("Displaying houses:", data);
     const resultsDiv = document.getElementById('results');
     if (!resultsDiv) {
+        console.error("Results div not found!");
         return;
     }
     
     clearStatus();
     
-    if (houses.address_found && houses.length === 0) {
+    if (!data.address_found) {
         resultsDiv.innerHTML = `
             <div class="text-center text-gray-600">
-                No buildings found within ${searchRadius} meters of the identified GPS coordinates ${houses.coords}.
+                ${data.error || 'Address not found'}
             </div>
         `;
-    } else if (!houses.address_found) {
-        resultsDiv.innerHTML = `
-            <div class="text-center text-gray-600">
-                The specified address was not found.
-            </div>
-        `;
-    } else {
-        resultsDiv.innerHTML = `
-            <h3 class="font-semibold text-lg mb-2">Buildings found within ${searchRadius} meters:</h3>
-            <div class="space-y-2">
-                ${houses.map(house => `
-                    <div class="p-4 border rounded-lg">
-                        <p class="text-gray-800 font-medium">${house.address}</p>
-                        <div class="text-sm text-gray-600 mt-1">
-                            <p>Type: ${house.type}</p>
-                            <p>Distance: ${house.distance}</p>
-                            <p class="text-xs">Coordinates: (${house.lat}, ${house.lng})</p>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
+        return;
     }
+
+    // Display found address and houses
+    resultsDiv.innerHTML = `
+        <div class="mb-4 text-gray-600">
+            <p class="font-medium">Found address: ${data.found_address}</p>
+            <p class="text-sm">Coordinates: (${data.coords[0]}, ${data.coords[1]})</p>
+        </div>
+        <h3 class="font-semibold text-lg mb-2">Buildings found within ${searchRadius} meters:</h3>
+        <div class="space-y-2">
+            ${data.houses.map(house => `
+                <div class="p-4 border rounded-lg">
+                    <p class="text-gray-800 font-medium">${house.address}</p>
+                    <div class="text-sm text-gray-600 mt-1">
+                        <p>Type: ${house.type}</p>
+                        <p>Distance: ${house.distance}</p>
+                        <p class="text-xs">Coordinates: (${house.lat}, ${house.lng})</p>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
 }
 </script>
 {% endblock %} 

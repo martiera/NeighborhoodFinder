@@ -29,20 +29,15 @@ async def fetch_nearby_buildings(latitude: float, longitude: float, radius: floa
     Fetch nearby buildings using OpenStreetMap's Overpass API
     radius is in meters
     """
-    # Convert meters to degrees (approximate, depends on latitude)
-    # At the equator, 1 degree ≈ 111.32 km
-    # We adjust for latitude using cos(lat)
-    lat_rad = math.radians(latitude)
-    meters_per_degree = 111320.0 * math.cos(lat_rad)
-    radius_deg = radius / meters_per_degree
+    # Convert radius to miles (Overpass API uses miles)
+    radius = radius / 1.60934
     
     # Overpass QL query to find buildings within radius
-    print(f"Searching for buildings around ({latitude}, {longitude}) with radius {radius}m ({radius_deg} degrees)")
     query = f"""
     [out:json][timeout:25];
     (
-      way["building"](around:{radius_deg * 111320},{latitude},{longitude});
-      relation["building"](around:{radius_deg * 111320},{latitude},{longitude});
+      way["building"](around:{radius},{latitude},{longitude});
+      relation["building"](around:{radius},{latitude},{longitude});
     );
     out center;
     """
@@ -55,7 +50,6 @@ async def fetch_nearby_buildings(latitude: float, longitude: float, radius: floa
                     return []
                 
                 data = await response.json()
-                print(f"Found {len(data.get('elements', []))} elements in response")
                 buildings = []
                 
                 for element in data.get("elements", []):
@@ -73,9 +67,9 @@ async def fetch_nearby_buildings(latitude: float, longitude: float, radius: floa
                         if not building["address"].strip():
                             building["address"] = f"Building at ({building['lat']:.6f}, {building['lng']:.6f})"
                         
-                        buildings.append(building)
+                        if building["address"].strip():
+                            buildings.append(building)
                 
-                print(f"Processed {len(buildings)} buildings")
                 return buildings
     
     except Exception as e:
@@ -88,8 +82,6 @@ async def get_nearby_houses(
     radius: int = 100
 ):
     try:
-        # print(f"Received request - Address: {address}, Radius: {radius}")  # Debug print
-        
         if not address:
             return {
                 "error": "Please provide an address",
@@ -101,15 +93,11 @@ async def get_nearby_houses(
         if not geocode_result["success"]:
             return {
                 "error": geocode_result["error"],
-                "address_found": False,
-                "details": geocode_result  # Include full details for debugging
+                "address_found": False
             }
             
         latitude, longitude = geocode_result["coords"]
-        print(f"Found coordinates: {latitude}, {longitude}")  # Debug print
-        
         buildings = await fetch_nearby_buildings(latitude, longitude, radius)
-        print(f"Found {len(buildings)} buildings")  # Debug print
         
         # Add distance information and sort by distance
         for building in buildings:
@@ -147,9 +135,8 @@ async def get_nearby_houses(
     except Exception as e:
         logger.error(f"Error in get_nearby_houses: {str(e)}")
         return {
-            "error": str(e),
-            "address_found": False,
-            "details": {"error_type": type(e).__name__}
+            "error": f"An error occurred while fetching nearby houses: {str(e)}",
+            "address_found": False
         }
 
 async def get_coordinates_from_address(address: str) -> Dict:
@@ -157,7 +144,8 @@ async def get_coordinates_from_address(address: str) -> Dict:
     url = "https://nominatim.openstreetmap.org/search"
     
     # Format address for better geocoding results
-    formatted_address = address.strip()
+    # formatted_address = address.replace('%20', '+').strip()
+    formatted_address = address.replace(' ', '+').strip()
     
     params = {
         "q": formatted_address,
@@ -168,18 +156,14 @@ async def get_coordinates_from_address(address: str) -> Dict:
     }
     
     headers = {
-        "User-Agent": "AddressLookupApp/1.0"  # Changed to a simple user agent
+        "User-Agent": "YourApp/1.0 (your@email.com)"
     }
     
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:  # Added timeout
-            # print(f"Sending request to Nominatim: {url} with params: {params}")  # Debug print
+        async with httpx.AsyncClient() as client:
             response = await client.get(url, params=params, headers=headers)
-            # print(f"Nominatim response status: {response.status_code}")  # Debug print
-            
             response.raise_for_status()
             data = response.json()
-            # print(f"Nominatim response data: {data}")  # Debug print
             
             if data:
                 return {
@@ -187,12 +171,10 @@ async def get_coordinates_from_address(address: str) -> Dict:
                     "coords": (float(data[0]['lat']), float(data[0]['lon'])),
                     "display_name": data[0].get('display_name', '')
                 }
-            
-            # If no results found with full address, try simplified version
-            simplified_address = address.split(',')[0].strip()
-            if simplified_address != formatted_address:
+            else:
+                # Try alternative search with less specific address
+                simplified_address = address.split(',')[0].strip()
                 params["q"] = simplified_address
-                print(f"Trying simplified address: {simplified_address}")  # Debug print
                 
                 response = await client.get(url, params=params, headers=headers)
                 response.raise_for_status()
@@ -205,28 +187,19 @@ async def get_coordinates_from_address(address: str) -> Dict:
                         "display_name": data[0].get('display_name', ''),
                         "note": "Used simplified address"
                     }
-            
-            return {
-                "success": False,
-                "error": "Could not find the specified address. Please check the spelling or try a different address.",
-                "status_code": 404
-            }
-                
+                else:
+                    return {
+                        "success": False,
+                        "error": "Address not found",
+                        "status_code": 404
+                    }
     except httpx.HTTPStatusError as e:
-        print(f"HTTP error: {e}")  # Debug print
         return {
             "success": False,
-            "error": f"Geocoding service error (HTTP {e.response.status_code})",
+            "error": f"Geocoding service error: {e.response.status_code}",
             "status_code": e.response.status_code
         }
-    except httpx.TimeoutException:
-        return {
-            "success": False,
-            "error": "Geocoding service timeout. Please try again.",
-            "status_code": 408
-        }
     except Exception as e:
-        print(f"Unexpected error: {e}")  # Debug print
         return {
             "success": False,
             "error": f"Error processing address: {str(e)}",
